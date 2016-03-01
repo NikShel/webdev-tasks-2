@@ -17,8 +17,6 @@ multivarka.server('mongodb://localhost:27017/test')
     });
  */
 
-module.exports = multivarka;
-
 var multivarka = {
     server: function (serverAddr) {
         return {
@@ -68,7 +66,6 @@ var multivarka = {
                             },
                             find: function (callback) {
                                 var mongoQuery = createMongoQuery(this);
-                                console.log(mongoQuery);
                                 var _this = this;
                                 MongoClient.connect(_this.server, function (err, db) {
                                     if (err) {
@@ -76,7 +73,7 @@ var multivarka = {
                                         return;
                                     }
                                     var collection = db.collection(_this.collection);
-                                    var data = collection
+                                    collection
                                         .find(mongoQuery)
                                         .toArray()
                                         .then(function (result) {
@@ -129,3 +126,5 @@ function createMongoQuery(multivarkaQuery) {
     }
     return mongoQuery;
 }
+
+module.exports = multivarka;
