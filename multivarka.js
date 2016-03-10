@@ -19,111 +19,106 @@ multivarka.server('mongodb://localhost:27017/test')
 
 var multivarka = {
     server: function (serverAddr) {
-        return {
-            server: serverAddr,
-            collection: function (collectionName) {
-                var collectionObject = {
-                    collection: collectionName,
-                    where: function (variableName) {
-                        var whereQueryObject = {
-                            variable: variableName,
-                            equal: function (value) {
-                                var equalExpressionObject = {
-                                    value: value,
-                                    type: 'equal'
-                                };
-                                Object.setPrototypeOf(equalExpressionObject, this);
-                                return equalExpressionObject;
-                            },
-                            include: function (valuesList) {
-                                var includeExpressionObject = {
-                                    includeValues: valuesList,
-                                    type: 'include'
-                                };
-                                Object.setPrototypeOf(includeExpressionObject, this);
-                                return includeExpressionObject;
-                            },
-                            not: function () {
-                                var negativeQueryObject = { negation: true };
-                                Object.setPrototypeOf(negativeQueryObject, this);
-                                return negativeQueryObject;
-                            },
-                            greatThan: function (value) {
-                                var greatExpressionObject = {
-                                    value: value,
-                                    type: 'great'
-                                };
-                                Object.setPrototypeOf(greatExpressionObject, this);
-                                return greatExpressionObject;
-                            },
-                            lessThan: function (value) {
-                                var lessExpressionObject = {
-                                    value: value,
-                                    type: 'less'
-                                };
-                                Object.setPrototypeOf(lessExpressionObject, this);
-                                return lessExpressionObject;
-                            },
-                            find: function (callback) {
-                                var mongoQuery = createMongoQuery(this);
-                                var _this = this;
-                                MongoClient.connect(_this.server, function (err, db) {
-                                    if (err) {
-                                        callback(err);
-                                        return;
-                                    }
-                                    var collection = db.collection(_this.collection);
-                                    collection
-                                        .find(mongoQuery)
-                                        .toArray()
-                                        .then(function (result) {
-                                            db.close();
-                                            callback(undefined, result);
-                                        });
-                                });
-                            }
-                        };
-                        Object.setPrototypeOf(whereQueryObject, this);
-                        return whereQueryObject;
-                    }
-                };
-                Object.setPrototypeOf(collectionObject, this);
-                return collectionObject;
+        this.serverAddr = serverAddr;
+        return this;
+    },
+    collection: function (collectionName) {
+        this.collectionName = collectionName;
+        this.query = [];
+        return this;
+    },
+    where: function (variable) {
+        this.currentVariable = variable;
+        return this;
+    },
+    not: function () {
+        this.negation = true;
+        return this;
+    },
+    _addQuery: function (type) {
+       this.query.push({
+            variable: this.currentVariable,
+            negation: this.negation,
+            type: type,
+            value: this.currentValue
+        });
+        this.negation = false;
+    },
+    equal: function (value) {
+        this.currentValue = value;
+        this._addQuery('equal');
+        return this;
+    },
+    lessThan: function (value) {
+        this.currentValue = value;
+        this._addQuery('less');
+        return this;
+    },
+    greatThan: function (value) {
+        this.currentValue = value;
+        this._addQuery('great');
+        return this;
+    },
+    include: function (values) {
+        this.currentValue = values;
+        this._addQuery('include');
+        return this;
+    },
+    find: function (callback) {
+        var mongoQuery = createMongoQuery(this.query);
+        console.log(mongoQuery);
+        var _this = this;
+        MongoClient.connect(_this.serverAddr, function (err, db) {
+            if (err) {
+                callback(err);
+                return;
             }
-        };
+            var collection = db.collection(_this.collectionName);
+            collection
+                .find(mongoQuery)
+                .toArray()
+                .then(function (result) {
+                    db.close();
+                    callback(null, result);
+                });
+        });
     }
 };
 
-function createMongoQuery(multivarkaQuery) {
-    var variable = multivarkaQuery.variable;
-    var queryType = multivarkaQuery.type;
+function createMongoQuery(multivarkaQueries) {
     var mongoQuery = {};
-    var negation = multivarkaQuery.negation;
-    var marker;
-    switch (queryType) {
-        case 'equal':
-            if (negation) {
-                mongoQuery[variable] = { $ne: multivarkaQuery.value };
-            } else {
-                mongoQuery[variable] = multivarkaQuery.value;
-            }
-            break;
-        case 'include':
-            marker = negation ? '$nin' : '$in';
-            mongoQuery[variable] = {};
-            mongoQuery[variable][marker] = multivarkaQuery.includeValues;
-            break;
-        case 'great':
-            marker = negation ? '$lte' : '$gt';
-            mongoQuery[variable] = {};
-            mongoQuery[variable][marker] = multivarkaQuery.value;
-            break;
-        case 'less':
-            marker = negation ? '$gte' : '$lt';
-            mongoQuery[variable] = {};
-            mongoQuery[variable][marker] = multivarkaQuery.value;
-            break;
-    }
+    multivarkaQueries.forEach(function (queryItem) {
+        var variable = queryItem.variable;
+        var queryType = queryItem.type;
+        var negation = queryItem.negation;
+        var value = queryItem.value;
+
+        var marker;
+        switch (queryType) {
+            case 'equal':
+                if (negation) {
+                    mongoQuery[variable] = { $ne: value };
+                } else {
+                    mongoQuery[variable] = value;
+                }
+                break;
+            case 'include':
+                marker = negation ? '$nin' : '$in';
+                mongoQuery[variable] = {};
+                mongoQuery[variable][marker] = value;
+                break;
+            case 'great':
+                marker = negation ? '$lte' : '$gt';
+                mongoQuery[variable] = {};
+                mongoQuery[variable][marker] = value;
+                break;
+            case 'less':
+                marker = negation ? '$gte' : '$lt';
+                mongoQuery[variable] = {};
+                mongoQuery[variable][marker] = value;
+                break;
+        }
+    });
     return mongoQuery;
 }
 
