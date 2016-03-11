@@ -96,11 +96,11 @@ function createMongoQuery(multivarkaQuery) {
     Object.keys(multivarkaQuery).forEach(function (variable) {
         var variableQueries = multivarkaQuery[variable];
         var queryPart = {};
-        if (variableQueries.length == 1) {
-            queryPart = convertMongoQueryPart(variableQueries[0]);
+        if (variableQueries.length === 1) {
+            queryPart = convertQueryPart(variableQueries[0]);
         } else {
             queryPart = {
-                $and: variableQueries.map(convertMongoQueryPart)
+                $and: variableQueries.map(convertQueryPart)
             };
         }
         Object.assign(mongoQuery, queryPart);
@@ -108,7 +108,7 @@ function createMongoQuery(multivarkaQuery) {
     return mongoQuery;
 }
 
-function convertMongoQueryPart(multivarkaQueryPart) {
+function convertQueryPart(multivarkaQueryPart) {
     var mongoQueryPart = {};
     var variable = multivarkaQueryPart.variable;
     var queryType = multivarkaQueryPart.type;
